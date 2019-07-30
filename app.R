@@ -1,5 +1,6 @@
 # Kyle Garrison Beard
 # NC State | ST 558 | Final Project 
+# This code is free and open source
 
 library(shiny)
 library(shinydashboard)
@@ -15,11 +16,12 @@ library(tree)
 library(randomForest)
 library(gbm)
 
-# https://www.kaggle.com/ronaldjgrafjr/nfl-draft-outcomes
-
 # ============================================================
 # Deliverables
 # ============================================================
+
+# Data source is given here:
+# https://www.kaggle.com/ronaldjgrafjr/nfl-draft-outcomes
 
 # --- General ---
 # [X] Multiple tabs
@@ -35,6 +37,9 @@ library(gbm)
 # [X] User functionality for choosing model settings (variables, # of trees, etc) for editing output
 # [X] Give the user a way to use model for prediction (select predictor values)
 
+# ============================================================
+# GLOBAL VARIABLES
+# ============================================================
 nflData <- read.csv("nfl_draft.csv") %>% group_by(Team) 
 nflData$Player_Id <- NULL
 nflData <- nflData %>% filter(Round < 8)
@@ -44,8 +49,10 @@ nflData <- nflData %>% filter(Round < 8)
 # ============================================================
 ui <- dashboardPage(
     
+    # Set the header for the dashboard
     dashboardHeader(title = "NFL Draft Picks Exploration"),
     
+    # Establish names, pointers, and icons for the tab items
     dashboardSidebar(
         sidebarMenu(
             menuItem("Home", tabName = "home", icon = icon("home")),
@@ -56,11 +63,12 @@ ui <- dashboardPage(
         )
     ),
     
+    # Body content
     dashboardBody(
         
         tabItems(
             
-            # Home Page | Describe the data and abilities of app
+            # (1) Home Page | Describe the data and abilities of app
             tabItem(tabName = "home",
                 fluidRow(
                     box(
@@ -84,7 +92,7 @@ ui <- dashboardPage(
                 )
             ),
             
-            # Data Viewing | Allows the user to scroll through the data (or subset data of interest)
+            # (2) Data Viewing | Allows the user to scroll through the data (or subset data of interest)
             tabItem(tabName = "view",
                 fluidRow(
                     box(h3("Filter by team and position"),
@@ -97,7 +105,7 @@ ui <- dashboardPage(
                 )
             ),
             
-            # Data Exploration | Common numerical and graphical summaries can be created by user
+            # (3) Data Exploration | Common numerical and graphical summaries can be created by user
             tabItem(tabName = "exploration",
                 fluidRow(
                     box(h3("Playing Favorites"),
@@ -106,7 +114,6 @@ ui <- dashboardPage(
                         plotOutput("plot1")
                     ),
                     
-                    # add an option
                     box(h3("Powerhouse Position Colleges"),
                         h6("The Accumulated Value (AV) score is a scalar metric that ranks the overall value a player brought their team each season. Let's filter by college to see which positions were notoriously better in the pros!"),
                         uiOutput("equation"),
@@ -131,7 +138,7 @@ ui <- dashboardPage(
                 )
             ),
             
-            # Clustering or PCA | Include dendogram for cluster or biplot for PCA - user should specify algorithm aspects
+            # (4) Clustering or PCA | Include dendogram for cluster or biplot for PCA - user should specify algorithm aspects
             tabItem(tabName = "cluster",
                 fluidRow(
                     box(h3("Clustering"),
@@ -149,8 +156,7 @@ ui <- dashboardPage(
                 )
             ),
             
-            # Modeling | See deliverables above
-            # Try to model yards or TDs or passing by QB
+            # (5) Modeling | See deliverables above
             tabItem(tabName = "model",
                 fluidRow(
                     box(h3("Simple Linear Regression (SLR)"),
@@ -175,14 +181,24 @@ ui <- dashboardPage(
 # ============================================================
 server <- function(input, output) {
     
-    # --- Scroll & Filter ---
+    # --- (1) Home ---
     
+    # Display URl to view more information
+    url <- a("here.", href="https://www.nfl.com/draft/home")
+    output$tab <- renderUI({
+        tagList("To learn more about the NFL Draft ", url)
+    })
+    
+    # --- (2) Scroll & Filter ---
+    
+    # Data table to display team vs position
     output$table1 <- DT::renderDataTable(
         
         nflData %>% filter(Team == input$team1, Position_Standard == input$position1),
         options = list(scrollX = TRUE)
     )
     
+    # Action button to download table1 to csv file
     output$downloadTable <- downloadHandler(
         filename = function() {
             paste('table', ".csv", sep = "")
@@ -192,19 +208,19 @@ server <- function(input, output) {
         }
     )
     
-    # --- Explore Deeper ---
+    # --- (3) Explore Deeper ---
     
+    # Generate a plot from user selected team for Round drafted vs. Games played
     output$plot1 <- renderPlot({
         
-        # get filtered data
         data <- nflData %>% filter(Team == input$team2) %>% group_by(Position_Standard) %>% group_by(Round)
         
-        # create plot
         g <- ggplot(data, aes(x = Round, y = G))
         g + geom_bar(stat = "identity") + scale_x_discrete(limits = c(1, 7)) +
             xlab("Round Drafted") + ylab("Total Games Played") + title("Games Played vs. Draft Round")
     })
     
+    # Reactive variable for dynamic UI plot for choosing college vs. Approx Value
     collegePositionAV <- reactive({
         
         multi <- input$compareSchools
@@ -223,38 +239,39 @@ server <- function(input, output) {
             xlab("Position") + ylab("Accumulated Value") + title("Career Approximate Value Metrics per Position")
     })
     
+    # Plot reactive college above
     output$plot2 <- renderPlot({
         
         collegePositionAV()
     })
     
+    # Action button to save data table
     saveDataTable <- reactive({
         nflData %>% filter(Team == input$team1, Position_Standard == input$position1)
     })
     
+    # Contignency table for viewing popularity of positions drafted in each round
     output$contingency <- renderTable({
         
         data <- nflData %>% group_by(Position) %>% filter(Round < 8, Team == input$team2)
         tab <- sort(table(data$Position_Standard, dnn = "Position"), decreasing = TRUE)
     })
     
+    # Dynamic UI element for changing the title for contingency table based upon selection
     output$popularityTitle <- renderUI({
         
         paste0("Frequency of ", input$team2, " First Round Picks")
     })
     
+    # Interactive plot for QB passing yards vs TDs
     output$plot3 <- renderPlotly({
         
         data <- nflData %>% filter(Position == "QB")
         g <- ggplot(data, aes(x = Pass_Yds, y = Pass_TD)) + geom_point(aes(colour = Team)) + 
             xlab("Passing Yards") + ylab("Touchdowns")
     })
-
-    url <- a("here.", href="https://www.nfl.com/draft/home")
-    output$tab <- renderUI({
-        tagList("To learn more about the NFL Draft ", url)
-    })
     
+    # Action button to download reactive plot
     output$downloadPlot <- downloadHandler(
         filename = function() { paste('collegeValuePerPosition', '.png', sep='') },
         content = function(file) {
@@ -262,15 +279,16 @@ server <- function(input, output) {
         }
     )
     
+    # Display equation for AV was calculated for dynamic college plot
     output$equation <- renderUI({
         withMathJax(
             helpText('$$\\sum_{y=rookie}^{retirement} AV_y$$')
         )
     })
     
-    # --- Modeling ---
+    # --- (4) Modeling ---
     
-    # (1) GLM to predict Round drafted by Passing TD, Passing Yds, or AV
+    # SLR to predict Career AV by different position parameters
     output$slr <- renderPlot({
         
         set.seed(1)
@@ -339,6 +357,7 @@ server <- function(input, output) {
         }
     })
     
+    # GLM for predicting probability that the player was a 1st Round draft pick based on AV on first 4 seasons
     output$glm <- renderPlot({
         
         set.seed(1)
@@ -363,18 +382,21 @@ server <- function(input, output) {
         }
     })
     
-    # --- Clustering ---
+    # --- (5) Clustering ---
     
+    # Create reactive cluster data from user input
     clusterData <- reactive({
         
         nflData[, c(input$xcol, input$ycol)]
     })
     
+    # Create kmeans cluster reactive
     clusters <- reactive({
         set.seed(15)
         kmeans(clusterData(), input$clusters, iter.max = input$iterations, algorithm = "MacQueen")
     })
     
+    # Plot cluster for visual purposes from user input selection
     output$cluster <- renderPlot({
         
         # Palette taken from Clustering notes
@@ -393,6 +415,7 @@ server <- function(input, output) {
                lwd = 4)
     })
     
+    # Display additional dendogram from cluster selection
     output$dendogram <- renderPlot({
         
         dd <- dist(data.frame(nflData[, c(input$xcol, input$ycol)]), method = "euclidean")
