@@ -75,6 +75,7 @@ ui <- dashboardPage(
                         h2("Welcome!"),
                         h4("This dataset displays the NFL Draft results from 1985 to 2015 for players picked, their position, team, and average stats in the pros. Please select one of the following options in the menu to explore the data further!"),
                         uiOutput("tab"),
+                        uiOutput("source"),
                         h3("1. Scroll & Filter"),
                         h5("In this section, you can filter by Team or Position to see all of the NFL Draft data!"),
                         h3("2. Explore Deeper"),
@@ -183,10 +184,16 @@ server <- function(input, output) {
     
     # --- (1) Home ---
     
-    # Display URl to view more information
-    url <- a("here.", href="https://www.nfl.com/draft/home")
+    # Display URl to view more information about NFL Draft
+    url1 <- a("here.", href="https://www.nfl.com/draft/home")
     output$tab <- renderUI({
-        tagList("To learn more about the NFL Draft ", url)
+        tagList("To learn more about the NFL Draft ", url1)
+    })
+    
+    # Display URL link for data source
+    url2 <- a("here.", href="https://www.kaggle.com/ronaldjgrafjr/nfl-draft-outcomes")
+    output$source <- renderUI({
+        tagList("See the Kaggle data source and more information ", url2)
     })
     
     # --- (2) Scroll & Filter ---
